@@ -202,12 +202,13 @@ def make_handler(state):
             live_target, live_err = _live(req.get("live"))
             if live_err:
                 return self._err(400, live_err)
+            deep = bool((req.get("live") or {}).get("deep"))
             try:
                 root, tmp = prepare(source)
             except SourceError as exc:
                 return self._err(400, str(exc))
             try:
-                findings, checks, notes, secs = run_scan(root, _options(req.get("options")), live_target)
+                findings, checks, notes, secs = run_scan(root, _options(req.get("options")), live_target, deep=deep)
             finally:
                 if tmp:
                     shutil.rmtree(tmp, ignore_errors=True)
@@ -221,6 +222,7 @@ def make_handler(state):
             live_target, live_err = _live(opts.get("live"))
             if live_err:
                 return self._err(400, live_err)
+            deep = bool((opts.get("live") or {}).get("deep"))
             data = self._body(MAX_UPLOAD)
             if data is None:
                 return self._err(413, "Zip is larger than %d MB." % (MAX_UPLOAD // (1024 * 1024)))
@@ -233,7 +235,7 @@ def make_handler(state):
                     root, tmp = extract_zip(zpath)
                 except SourceError as exc:
                     return self._err(400, str(exc))
-                findings, checks, notes, secs = run_scan(root, _options(opts.get("options")), live_target)
+                findings, checks, notes, secs = run_scan(root, _options(opts.get("options")), live_target, deep=deep)
             finally:
                 try:
                     os.remove(zpath)

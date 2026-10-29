@@ -20,7 +20,7 @@ STAGES = [
 ]
 
 
-def run_scan(root, options=None, live_target=None, staged=None):
+def run_scan(root, options=None, live_target=None, staged=None, deep=False, progress=None):
     """Run every enabled check.
 
     options: {"checks": [...stage keys...], "history": bool, "audit": bool}
@@ -42,9 +42,10 @@ def run_scan(root, options=None, live_target=None, staged=None):
     if staged is not None:
         findings = [f for f in findings if f.file in staged]
     if live_target:
-        live_findings, note = run_live(live_target, root if os.path.isdir(root) else None)
+        live_findings, note = run_live(live_target, root if os.path.isdir(root) else None,
+                                       deep=deep, progress=progress)
         findings += live_findings
-        checks.append("live localhost")
+        checks.append("live localhost (deep)" if deep else "live localhost")
         if note:
             notes.append(note)
     return findings, checks, notes, round(time.time() - started, 2)

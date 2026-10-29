@@ -45,6 +45,7 @@ def build_parser():
     s.add_argument("source", nargs="?", default=".", help="folder, .zip or https repo link (default: .)")
     s.add_argument("--live", metavar="URL", help="also run the consent-based live check on YOUR localhost app")
     s.add_argument("--yes-i-own-this", action="store_true", help="give live-check consent non-interactively")
+    s.add_argument("--deep", action="store_true", help="max-level live check: a thorough 2-3 minute localhost sweep")
     s.add_argument("--audit", action="store_true", help="also run pip-audit / npm audit if installed (uses the network)")
     s.add_argument("--no-history", action="store_true", help="skip the git history check")
     s.add_argument("--staged", action="store_true", help="only scan files staged for commit (used by the hook)")
@@ -105,12 +106,15 @@ def cmd_scan(args):
         return 2
     try:
         staged = _staged_files(root) if args.staged else None
-        if live_target and not ask_consent(live_target, args.yes_i_own_this):
+        if live_target and not ask_consent(live_target, args.yes_i_own_this, deep=args.deep):
             print("Consent not given - live check skipped.\n")
             live_target = None
+        if live_target and args.deep:
+            print("Deep sweep running - this takes about 2-3 minutes. Checking:", flush=True)
+        progress = (lambda p: print("  .", p, flush=True)) if (live_target and args.deep and not args.quiet) else None
         findings, checks, notes, secs = run_scan(
             root, {"history": not args.no_history, "audit": args.audit},
-            live_target=live_target, staged=staged)
+            live_target=live_target, staged=staged, deep=args.deep, progress=progress)
         print_terminal(findings, args.source, checks, color=use_color(args.no_color), quiet=args.quiet)
         for note in notes:
             print("\nNote:", note)
