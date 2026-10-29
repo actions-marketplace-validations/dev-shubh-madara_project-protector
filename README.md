@@ -74,6 +74,27 @@ python -m cipherbloom ui
 
 The dashboard is locked down: it listens on `127.0.0.1` only, rejects foreign `Host` headers (DNS-rebinding protection), refuses cross-site requests, and requires a random per-launch session token.
 
+## 🎬 Proof it works
+
+Real screen recording, nothing staged. CipherBloom Guardian scans [**DefaultMart**](https://github.com/dev-shubh-madara/test-web-project-protector), a shop that is vulnerable on purpose with 42 planted problems, and catches **all 42**.
+
+<p align="center"><img src="assets/proof-demo.gif" alt="Screen recording: CipherBloom Guardian scans a vulnerable demo shop and finds every planted problem" width="100%"></p>
+
+<p align="center"><sub>Folder scan + live localhost check, typed consent (<code>I OWN THIS</code>), 63 findings in 0.25 seconds. No AI, no API key, offline.</sub></p>
+
+| The scoreboard | One finding opened |
+|---|---|
+| <img src="assets/proof-42-of-42.jpg" alt="Terminal showing Caught 42 of 42 planted problems"> | <img src="assets/proof-finding.jpg" alt="A finding showing file, line, why it matters and how to fix it"> |
+| `Caught 42 of 42 planted problems.` | File, line, why it matters, how to fix it. Secrets stay masked (`AKIA...EW`). |
+
+**Try it yourself in two minutes:**
+
+```bash
+git clone https://github.com/dev-shubh-madara/test-web-project-protector
+cd test-web-project-protector
+python lab.py scoreboard
+```
+
 ## 🔍 What it checks
 
 | Check | What it finds | Example fix it gives you |
