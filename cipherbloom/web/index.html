@@ -105,7 +105,10 @@ label.lbl{display:block;font-size:12.5px;color:var(--dim);font-weight:600;margin
 .sw input:checked+i::after{transform:translateX(20px)}
 .sw input:focus-visible+i{outline:2px solid var(--cyan);outline-offset:2px}
 .live-body{max-height:0;overflow:hidden;opacity:0;transition:max-height .5s ease,opacity .4s ease,margin .4s}
-.live-body.on{max-height:520px;opacity:1;margin-top:14px}
+.live-body.on{max-height:620px;opacity:1;margin-top:14px}
+.live-body.on.deep{max-height:720px}
+.switch.mini{padding:10px 12px;border:1px solid var(--line,#ffffff1f);border-radius:12px;background:#ffffff08}
+.switch.mini small{opacity:.72}
 .consent{font-size:12.8px;color:var(--dim);background:rgba(0,0,0,.25);border:1px solid var(--stroke);border-radius:14px;padding:12px 14px;margin:12px 0}
 .consent ul{margin:6px 0 0;padding-left:18px}.consent li{margin:2px 0}
 .consent .no{color:#ffb1c4}
@@ -278,12 +281,16 @@ footer a{color:var(--dim)}
         <div class="live-body" id="liveBody">
           <label class="lbl" for="liveUrl">Your app's local address</label>
           <input class="field" id="liveUrl" value="http://127.0.0.1:8000" autocomplete="off" spellcheck="false">
+          <label class="switch mini" for="deepOn" style="margin-top:12px">
+            <span><b>&#9889; Deep sweep &mdash; max level</b><small>A thorough 2&ndash;3 minute localhost audit: ~150 sensitive files, every header, HTTP methods, a crawl of your pages, reflection &amp; SQL-error canaries.</small></span>
+            <span class="sw"><input type="checkbox" id="deepOn"><i></i></span>
+          </label>
           <div class="consent">
             <b>What the live check does</b>
-            <ul>
-              <li>About 25 ordinary read-only GET requests to the address above</li>
-              <li>Looks for downloadable .env / .git / backups, CORS, security headers, debug pages, cookie flags</li>
-              <li class="no">Never sends attack payloads, floods, guesses passwords or changes data</li>
+            <ul id="liveList">
+              <li id="liveL1">About 25 ordinary read-only GET requests to the address above</li>
+              <li id="liveL2">Looks for downloadable .env / .git / backups, CORS, security headers, debug pages, cookie flags</li>
+              <li class="no">Never floods, guesses passwords, runs destructive payloads or changes data</li>
               <li class="no">Refuses any address that is not localhost / 127.0.0.1</li>
             </ul>
           </div>
@@ -421,6 +428,15 @@ footer a{color:var(--dim)}
 
   /* ---- live toggle ---- */
   $("liveOn").addEventListener("change", function () { $("liveBody").classList.toggle("on", this.checked); });
+  $("deepOn").addEventListener("change", function () {
+    $("liveBody").classList.toggle("deep", this.checked);
+    $("liveL1").textContent = this.checked
+      ? "A slow, thorough 2-3 minute sweep: several hundred read-only GET requests"
+      : "About 25 ordinary read-only GET requests to the address above";
+    $("liveL2").textContent = this.checked
+      ? "~150 sensitive files, every security header, cookie flags, CORS, HTTP methods, a crawl of your pages, reflection & SQL-error canaries"
+      : "Looks for downloadable .env / .git / backups, CORS, security headers, debug pages, cookie flags";
+  });
   $("phrase").addEventListener("input", function () { this.classList.toggle("phrase-ok", this.value.trim() === "I OWN THIS"); });
 
   /* ---- remember inputs (per-browser convenience only) ---- */
@@ -435,7 +451,7 @@ footer a{color:var(--dim)}
   }
   function live() {
     if (!$("liveOn").checked) return null;
-    return {url: $("liveUrl").value.trim(), phrase: $("phrase").value.trim()};
+    return {url: $("liveUrl").value.trim(), phrase: $("phrase").value.trim(), deep: $("deepOn").checked};
   }
   var stepTimer = null;
   function startSteps(keys) {

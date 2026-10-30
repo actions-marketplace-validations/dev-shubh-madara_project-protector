@@ -37,6 +37,7 @@ Every week, developers push a bot token, an AWS key or a whole `.env` file to Gi
 | 🪶 **Zero dependencies** | Only the Python standard library. Installs in seconds, nothing to break. |
 | 🖥️ **CLI + glass dashboard** | Use the terminal, or open a beautiful localhost dashboard with one command. |
 | 🛡️ **Ethical live testing** | Tests your **running localhost app** only after you type `I OWN THIS`. Never touches other sites. |
+| ⚡ **Deep sweep (max level)** | An opt-in 2–3 minute localhost audit: ~150 sensitive files, every security header, HTTP methods, a crawl of your pages, and read-only reflection / SQL-error canaries. |
 | 🤖 **CI and pre-commit ready** | Block leaked secrets before they're committed, and fail pull requests that contain them. |
 
 ## 🚀 Quick start
@@ -117,6 +118,7 @@ Secret values are **always masked** in output (`AKIA...56`), so reports are safe
 ```text
 cipherbloom scan [SOURCE]           Scan a folder (default .), a .zip or an https repo link
     --live URL                      Also run the consent-based live check on YOUR localhost app
+    --deep                          Max-level live check: a thorough 2-3 minute localhost sweep
     --yes-i-own-this                Give live-check consent non-interactively (CI)
     --html FILE / --json FILE       Save an animated HTML report or a JSON report
     --fail-on LEVEL                 Exit 1 if any finding is at/above LEVEL (critical..info)
@@ -160,6 +162,9 @@ No. It only reads files. The live check sends ordinary GET requests to an app *y
 
 **Can I use it to test someone else's website?**
 No, and that's deliberate. The live check refuses every address that isn't `localhost` / `127.0.0.1`, and it requires your typed consent.
+
+**What is the deep sweep (`--deep`)?**
+A slow, thorough version of the live check for your own app. Turn it on with `--deep` on the CLI, or the **Deep sweep** switch in the dashboard. It takes 2–3 minutes and sends several hundred paced, read-only requests: ~150 sensitive-file paths (`.env`, `.git`/`.svn`, backups, SQL dumps, keys, CI secrets, logs), every modern security header, every cookie's flags, CORS, risky HTTP methods (`PUT`/`DELETE`/`TRACE`), admin/debug endpoints, a crawl of your own linked pages, and harmless reflection / SQL-error canaries (a marker string and a single quote — nothing destructive). It is paced on purpose so it stays a polite audit, never a flood.
 
 **Does a score of 100 mean my project is secure?**
 No. It means these checks passed. CipherBloom catches the most common, most expensive mistakes. It's not a replacement for a professional security review.
