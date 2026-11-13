@@ -55,6 +55,25 @@ def build_parser():
     s.add_argument("--no-color", action="store_true")
     s.add_argument("--quiet", action="store_true", help="hide the banner")
 
+    a = sub.add_parser("agent", help="let the agent plan the checks, investigate each finding and rank the fixes")
+    a.add_argument("source", nargs="?", default=".", help="folder, .zip or https repo link (default: .)")
+    a.add_argument("--ai", action="store_true", help="add an AI review on top, using YOUR model (see docs/GUIDE.md)")
+    a.add_argument("--ai-url", metavar="URL", help="OpenAI-compatible base URL (or set CIPHERBLOOM_LLM_URL)")
+    a.add_argument("--ai-model", metavar="NAME", help="model name (or set CIPHERBLOOM_LLM_MODEL)")
+    a.add_argument("--allow-send-code", action="store_true",
+                   help="agree to send masked snippets to a non-local AI endpoint (the key comes from CIPHERBLOOM_LLM_KEY)")
+    a.add_argument("--ai-steps", type=int, default=12, help="max tool steps the AI may take (default 12)")
+    a.add_argument("--live", metavar="URL", help="also run the consent-based live check on YOUR localhost app")
+    a.add_argument("--yes-i-own-this", action="store_true", help="give live-check consent non-interactively")
+    a.add_argument("--deep", action="store_true", help="max-level live check")
+    a.add_argument("--no-history", action="store_true", help="skip the git history check")
+    a.add_argument("--html", metavar="FILE", help="write the animated HTML report")
+    a.add_argument("--json", metavar="FILE", help="write a JSON report (includes the agent trace and fix plan)")
+    a.add_argument("--fail-on", choices=list(SEVERITY_ORDER),
+                   help="exit 1 if a rule-based finding at/above this level exists (AI ideas never count)")
+    a.add_argument("--no-color", action="store_true")
+    a.add_argument("--quiet", action="store_true", help="hide the banner")
+
     u = sub.add_parser("ui", help="open the glass dashboard in your browser (localhost only)")
     u.add_argument("--port", type=int, default=7878)
     u.add_argument("--no-open", action="store_true", help="do not open the browser automatically")
@@ -136,6 +155,56 @@ def cmd_scan(args):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def cmd_agent(args):
+    from .agent import run_agent
+    from .llm import LLMBrain, LLMError, Settings
+    from .report import print_agent, write_agent_json
+    brain = None
+    if args.ai:
+        settings = Settings(args.ai_url or "", args.ai_model or "", allow_send=args.allow_send_code)
+        try:
+            settings.check()
+        except LLMError as exc:
+            print("Error:", exc)
+            return 2
+        brain = LLMBrain(settings, max_steps=args.ai_steps)
+    live_target = None
+    if args.live:
+        try:
+            live_target = validate_target(args.live)
+        except ValueError as exc:
+            print("Error:", exc)
+            return 2
+    try:
+        root, tmp = prepare(args.source)
+    except SourceError as exc:
+        print("Error:", exc)
+        return 2
+    try:
+        if live_target and not ask_consent(live_target, args.yes_i_own_this, deep=args.deep):
+            print("Consent not given - live check skipped.\n")
+            live_target = None
+        result = run_agent(root, {"history": not args.no_history}, live_target=live_target,
+                           deep=args.deep, brain=brain)
+        print_agent(result, args.source, color=use_color(args.no_color), quiet=args.quiet)
+        if not args.quiet:
+            print("Finished in %.2fs" % result.seconds)
+        if args.html:
+            write_html(args.html, result.findings, args.source, result.checks)
+            print("HTML report :", args.html)
+        if args.json:
+            write_agent_json(args.json, result, args.source)
+            print("JSON report :", args.json)
+        if args.fail_on:
+            limit = SEVERITY_ORDER[args.fail_on]
+            if any(SEVERITY_ORDER[f.severity] <= limit and f.confidence != "ai-suggested" for f in result.findings):
+                return 1
+        return 0
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 def cmd_ui(args):
     from .server import serve
     return serve(port=args.port, open_browser=not args.no_open)
@@ -148,6 +217,8 @@ def main(argv=None):
         return cmd_hook(args)
     if args.cmd == "scan":
         return cmd_scan(args)
+    if args.cmd == "agent":
+        return cmd_agent(args)
     if args.cmd == "ui":
         return cmd_ui(args)
     parser.print_help()

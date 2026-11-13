@@ -17,6 +17,8 @@ class Finding:
     fix: str = ""
     snippet: str = ""
     category: str = "code"
+    confidence: str = ""
+    notes: str = ""
 
     def to_dict(self):
         return asdict(self)

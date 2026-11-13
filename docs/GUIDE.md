@@ -20,6 +20,7 @@ This guide covers everything from installing to fixing every kind of finding. Yo
 14. [Privacy and safety](#14-privacy-and-safety)
 15. [Limitations](#15-limitations)
 16. [Troubleshooting](#16-troubleshooting)
+17. [Agent mode](#17-agent-mode)
 
 ---
 
@@ -256,7 +257,7 @@ Other CI systems: `pip install git+https://github.com/dev-shubh-madara/project-p
 
 ## 14. Privacy and safety
 
-- Nothing is sent to any server. There is no AI, telemetry or account.
+- Nothing is sent to any server. There is no telemetry or account, and AI is off unless you pass `--ai` (see section 17).
 - `--audit` is the only option that uses the internet (it runs `pip-audit` / `npm audit`), and it's off by default.
 - Scanning a repo link downloads it with `git`. Everything else is local.
 - Code is read as text and **never executed**. Zips are checked for path-escape tricks and size before extracting.
@@ -284,3 +285,42 @@ Other CI systems: `pip install git+https://github.com/dev-shubh-madara/project-p
 | Too many "unpinned dependency" findings | Run `pip freeze > requirements.txt` once. |
 
 Still stuck? [Open an issue](https://github.com/dev-shubh-madara/project-protector/issues) with the command you ran and the output (secrets are already masked).
+
+## 17. Agent mode
+
+`cipherbloom agent` is for when the plain list of findings is too long and you want to know where to start.
+
+```bash
+cipherbloom agent .
+cipherbloom agent . --json report.json --html report.html
+```
+
+**What you get**
+
+- *What the agent did*: the profile it made of your project, the checks it chose or skipped (and why), and each step after that.
+- *Attack chains*: findings that are worse together, for example a committed `.env` that holds real keys.
+- *Fix these first*: a numbered plan. Rotating real secrets always comes before cleaning up code.
+- *All findings*, each with a tag: **sure** (rule matched and the context agrees), **likely**, or **maybe** (for example no user input reaches that line, or the file looks like sample data). The agent's note under a finding says why.
+
+Severity is never changed by the agent. A critical finding in a test folder is still critical; it is just tagged `maybe` so you can sort out the real ones first.
+
+**Using it in CI.** `--fail-on high` works the same as in `scan`.
+
+### Adding an AI review (optional)
+
+Off by default. You need a model of your own.
+
+| Where the model runs | Setup |
+|---|---|
+| On your computer (Ollama, LM Studio, llama.cpp server) | `CIPHERBLOOM_LLM_URL=http://localhost:11434/v1`, `CIPHERBLOOM_LLM_MODEL=<name from ollama list>`, then `cipherbloom agent . --ai`. Nothing leaves your machine. |
+| A hosted OpenAI-compatible service | Set the same two variables, put your key in `CIPHERBLOOM_LLM_KEY`, and add `--allow-send-code` to confirm that masked snippets will be sent there. |
+
+What it can and can't do:
+
+- It can list files, read line ranges and search, all read-only and inside your project folder.
+- Secret values are masked before sending, and `.env`, `.pem`, `.key` and similar files are refused outright.
+- It returns a verdict per finding (confirmed, possible false positive, needs a human look) and may suggest extra findings with a real file and line.
+- It cannot delete or downgrade findings, edit files or run commands. Its suggestions are labelled `ai-suggested`, capped below critical and ignored by `--fail-on`.
+- If it fails, answers badly or runs out of steps, you still get the built-in results plus a note.
+
+It is only as good as the model you point it at. Small local models miss things and sometimes get verdicts wrong, so use the notes as hints and verify before acting on them.
