@@ -6,7 +6,7 @@
   <a href="https://github.com/dev-shubh-madara/project-protector/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dev-shubh-madara/project-protector/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-8b5cff?logo=python&logoColor=white">
   <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-0-ff4fd8">
-  <img alt="No AI" src="https://img.shields.io/badge/AI%20%2F%20API%20key-not%20needed-36e2ff">
+  <img alt="No AI needed" src="https://img.shields.io/badge/AI%20%2F%20API%20key-optional-36e2ff">
   <img alt="Offline" src="https://img.shields.io/badge/runs-100%25%20offline-5dffa8">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-white"></a>
 </p>
@@ -32,7 +32,8 @@ Every week, developers push a bot token, an AWS key or a whole `.env` file to Gi
 | | |
 |---|---|
 | 🔒 **Zero trust needed** | Runs **100% offline** on your computer. Your code is read, never executed, never uploaded. |
-| 🧠 **No AI, no API key** | Pure Python rules. Free forever, works on a plane, gives the same result every time. |
+| 🧠 **No AI, no API key** | Pure Python rules. Free forever, works on a plane, gives the same result every time. AI review is an opt-in extra, never a requirement. |
+| 🕵️ **Agent mode** | `cipherbloom agent` plans the checks, investigates every finding and tells you what to fix first. |
 | 📍 **File + line + fix** | Every finding tells you *where*, *why it matters* and *exactly how to fix it*. |
 | 🪶 **Zero dependencies** | Only the Python standard library. Installs in seconds, nothing to break. |
 | 🖥️ **CLI + glass dashboard** | Use the terminal, or open a beautiful localhost dashboard with one command. |
@@ -49,7 +50,10 @@ pip install git+https://github.com/dev-shubh-madara/project-protector
 # 2. Scan any project
 cipherbloom scan path/to/your/project
 
-# 3. Or open the dashboard
+# 3. Or let the agent investigate and rank the fixes
+cipherbloom agent path/to/your/project
+
+# 4. Or open the dashboard
 cipherbloom ui
 ```
 
@@ -96,6 +100,53 @@ cd test-web-project-protector
 python lab.py scoreboard
 ```
 
+## 🕵️ Agent mode
+
+A normal scan gives you a long flat list. `cipherbloom agent` works more like a reviewer sitting next to you:
+
+```bash
+cipherbloom agent path/to/your/project
+```
+
+1. **Looks at the project** (languages, framework, git or not, where the `.env` files are).
+2. **Plans** which checks are worth running and says why it skipped the others.
+3. **Runs them**, then **investigates every finding** instead of just printing it:
+   - Is the secret's file committed, in git history, or safely git-ignored?
+   - Is it in browser-facing code that every visitor can download?
+   - Does user input (`request.args`, `req.body`, `input()`) reach the risky line *in the same function*, or is it internal-only?
+   - Does it sit in a test or example folder?
+4. **Links findings that make each other worse** (a tracked `.env` with real keys, injectable code next to debug mode).
+5. **Hands you a fix order**, most urgent first, with a `sure / likely / maybe` tag on every finding so you know what to trust.
+
+Every step it took is printed, so nothing is a black box. All of this is still plain Python: no AI, no key, offline.
+
+### Optional: add an AI review
+
+If you want a second opinion from a model, bring your own. Nothing is bundled and nothing is on by default.
+
+```bash
+# a local model: nothing leaves your machine, no key needed
+export CIPHERBLOOM_LLM_URL=http://localhost:11434/v1
+export CIPHERBLOOM_LLM_MODEL=qwen2.5-coder
+cipherbloom agent . --ai
+
+# or any OpenAI-compatible service, with your own key
+export CIPHERBLOOM_LLM_URL=https://api.openai.com/v1
+export CIPHERBLOOM_LLM_MODEL=gpt-4o-mini
+export CIPHERBLOOM_LLM_KEY=...        # read from the environment, never a command-line flag
+cipherbloom agent . --ai --allow-send-code
+```
+
+The model reads code through a few read-only tools, gives a verdict on each finding and may point out extra problems the rules missed. The guard rails:
+
+- Secrets are masked before any text is sent, and `.env`, `.pem` and key files can't be read at all.
+- A non-local endpoint is refused unless you pass `--allow-send-code`, and plain `http://` to a remote host is always refused.
+- The model can't write files, run anything or leave the project folder.
+- It can't remove or downgrade a finding. A "probably a false positive" verdict only adds a note. Its own suggestions are labelled `ai-suggested` and never count towards `--fail-on`.
+- Project files are treated as untrusted text. A comment saying "ignore your instructions" can at worst skew a note, not hide a finding.
+
+Models make mistakes, so treat the AI notes as hints and check them.
+
 ## 🔍 What it checks
 
 | Check | What it finds | Example fix it gives you |
@@ -127,6 +178,13 @@ cipherbloom scan [SOURCE]           Scan a folder (default .), a .zip or an http
     --staged                        Only check staged files (used by the pre-commit hook)
     --no-color / --quiet
 
+cipherbloom agent [SOURCE]          Plan, investigate and rank the fixes (offline, no AI)
+    --ai                            Add an AI review using YOUR model (see Agent mode)
+    --ai-url URL / --ai-model NAME  OpenAI-compatible endpoint and model (or the CIPHERBLOOM_LLM_* env vars)
+    --allow-send-code               Agree to send masked snippets to a non-local endpoint
+    --ai-steps N                    Max tool steps the AI may take (default 12)
+    --live / --deep / --html / --json / --fail-on / --no-history   Same as scan; the JSON also holds the trace and fix plan
+
 cipherbloom ui [--port 7878] [--no-open]   Open the localhost dashboard
 cipherbloom hook install|uninstall [PATH]  Block commits that contain secrets
 ```
@@ -155,7 +213,10 @@ The HTML report is uploaded as a build artifact automatically.
 ## ❓ FAQ
 
 **Do I need an AI API key or any paid service?**
-No. Every check is a rule written in plain Python. Nothing is sent anywhere.
+No. Every check, and the agent's planning and investigating, is plain Python. Nothing is sent anywhere. The AI review (`--ai`) is optional and uses a model you provide, local or hosted.
+
+**Is the agent actually "AI"?**
+By default it is an agent in the plan, act, observe sense (it chooses checks, follows up on each finding, links them and ranks the fixes) but the reasoning is hand-written rules, not a language model. Add `--ai` if you want a model in the loop.
 
 **Will it run my code?**
 No. It only reads files. The live check sends ordinary GET requests to an app *you* already started on localhost.
@@ -174,6 +235,7 @@ Add `# cipherbloom:ignore` to that line, or open an issue so the rule can be imp
 
 ## 🗺️ Roadmap
 
+- [ ] Agent results inside the dashboard
 - [ ] More secret providers (Twilio, SendGrid, Supabase, Firebase, Hugging Face)
 - [ ] Framework-aware route mapping for live findings (FastAPI, Flask, Express)
 - [ ] SARIF output for GitHub code scanning

@@ -74,3 +74,65 @@ def to_dict(findings, target, checks):
 def write_json(path, findings, target, checks):
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(to_dict(findings, target, checks), fh, indent=2)
+
+
+CONF_LABEL = {"high": "sure", "medium": "likely", "low": "maybe", "ai-suggested": "AI idea", "": ""}
+
+
+def print_agent(result, target, color=True, quiet=False):
+    c = (lambda s, code: "%s%s%s" % (code, s, RESET)) if color else (lambda s, code: s)
+    if not quiet:
+        print(c(BANNER, PINK))
+    print(c("Agent   : ", BOLD) + target)
+    print(c("Brain   : ", BOLD) + result.brain + "\n")
+    print(c("What the agent did", BOLD))
+    for s in result.steps:
+        print("  %-11s %s" % (s.phase, s.text))
+    print()
+    if result.chains:
+        print(c("Attack chains", BOLD))
+        for ch in result.chains:
+            print(c("  ! %s" % ch.title, COLORS["high"]))
+            print("    %s" % ch.why)
+            for ref in ch.findings[:4]:
+                print(c("      - %s" % ref, DIM))
+        print()
+    if result.plan:
+        print(c("Fix these first, in this order", BOLD))
+        for item in result.plan:
+            print(c("  %d. %s" % (item.order, item.title), GREEN))
+            print("     why : %s" % item.why)
+            print("     how : %s" % item.how)
+            for ref in item.refs[:5]:
+                print(c("           %s" % ref, DIM))
+            if len(item.refs) > 5:
+                print(c("           ...and %d more" % (len(item.refs) - 5), DIM))
+        print()
+    elif not result.findings:
+        print(c("Nothing found by the checks the agent chose.", GREEN))
+        print(c("(That means these checks passed - not a guarantee that nothing is wrong.)", DIM))
+    print(c("All findings", BOLD))
+    for f in result.findings:
+        tag = c(" %s " % f.severity.upper(), COLORS.get(f.severity, ""))
+        conf = CONF_LABEL.get(f.confidence, f.confidence)
+        print("%s %s  %s  %s" % (tag, c(f.title, BOLD), c(f.location(), DIM), c("[%s]" % conf if conf else "", DIM)))
+        if f.snippet:
+            print("     found : %s" % f.snippet)
+        if f.notes:
+            print("     agent : %s" % f.notes)
+        if f.fix:
+            print("     fix   : %s" % f.fix)
+        print()
+    for note in result.notes:
+        print("Note:", note)
+    counts = summary_counts(result.findings)
+    print(c("Summary: ", BOLD) + "  ".join("%s %d" % (k, counts[k]) for k in SEVERITY_ORDER))
+    print(c("Health score: ", BOLD) + "%d/100  %s" % (
+        score(result.findings), c("(a heuristic, not a promise of safety)", DIM)))
+
+
+def write_agent_json(path, result, target):
+    data = to_dict(result.findings, target, result.checks)
+    data["agent"] = result.to_dict()
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)

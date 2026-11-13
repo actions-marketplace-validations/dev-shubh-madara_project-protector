@@ -5,7 +5,7 @@ Thanks for helping developers keep their secrets safe. Small, focused pull reque
 ## Ground rules
 
 - **No new runtime dependencies.** The tool must keep working with only the Python standard library.
-- **No AI calls or network calls by default.** Anything that needs the internet must be opt-in (like `--audit`).
+- **No AI calls or network calls by default.** Anything that needs the internet must be opt-in (like `--audit` or `agent --ai`). The agent's own logic stays plain rules.
 - **Read code, never run it.** Scanners must treat project files as text.
 - **Live checks stay harmless and localhost-only.** No attack payloads, brute force, flooding or writes.
 - **Every finding needs a plain-language `why` and an actionable `fix`.**
